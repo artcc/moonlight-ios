@@ -587,7 +587,13 @@
 - (void) updatePreferredDisplayMode:(BOOL)streamActive {
 #if TARGET_OS_TV
     if (@available(tvOS 11.2, *)) {
-        UIWindow* window = [[[UIApplication sharedApplication] delegate] window];
+        // Under the UIScene lifecycle the window belongs to the scene, not the app
+        // delegate (whose -window is nil), so get it from our own view. Fall back to
+        // the app delegate's window for the legacy (pre-scene) lifecycle.
+        UIWindow* window = self.view.window;
+        if (window == nil) {
+            window = [[[UIApplication sharedApplication] delegate] window];
+        }
         AVDisplayManager* displayManager = [window avDisplayManager];
         
         // This logic comes from Kodi and MrMC
