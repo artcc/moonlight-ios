@@ -7,6 +7,7 @@
 //
 
 #import "UIComputerView.h"
+#import "MoonlightAppearance.h"
 
 @implementation UIComputerView {
     TemporaryHost* _host;
@@ -18,6 +19,8 @@
     CGSize _labelSize;
 }
 static const float REFRESH_CYCLE = 2.0f;
+static UIImage* pairingBadge;
+static UIImage* offlineBadge;
 
 #if TARGET_OS_TV
 static const int ITEM_PADDING = 50;
@@ -26,6 +29,20 @@ static const int LABEL_DY = 40;
 static const int ITEM_PADDING = 0;
 static const int LABEL_DY = 20;
 #endif
+
+- (BOOL) setHostIconSymbol:(NSString*)symbolName color:(UIColor*)color {
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIImageSymbolConfiguration* configuration = [UIImageSymbolConfiguration configurationWithPointSize:_hostIcon.frame.size.width * 0.55
+                                                                                                    weight:UIImageSymbolWeightRegular];
+        UIImage* symbol = [UIImage systemImageNamed:symbolName withConfiguration:configuration];
+        if (symbol != nil) {
+            symbol = [symbol imageWithTintColor:color renderingMode:UIImageRenderingModeAlwaysOriginal];
+            [_hostIcon setImage:MLCardImage(_hostIcon.frame.size, _hostIcon.frame.size.width * 0.14, symbol)];
+            return YES;
+        }
+    }
+    return NO;
+}
 
 - (id) init {
     self = [super init];
@@ -42,22 +59,28 @@ static const int LABEL_DY = 20;
     
     _hostIcon = [[UIImageView alloc] initWithFrame:self.frame];
     [_hostIcon setImage:[UIImage imageNamed:@"Computer"]];
+
+    [self setHostIconSymbol:@"desktopcomputer" color:MLTextColor()];
     
     self.layer.shadowColor = [[UIColor blackColor] CGColor];
-    self.layer.shadowOffset = CGSizeMake(5,8);
-    self.layer.shadowOpacity = 0.3;
+    self.layer.shadowOffset = CGSizeMake(0, 4);
+    self.layer.shadowOpacity = 0.18;
+    self.layer.shadowRadius = 10;
 
     [self addTarget:self action:@selector(hostButtonSelected:) forControlEvents:UIControlEventTouchDown];
     [self addTarget:self action:@selector(hostButtonDeselected:) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchCancel | UIControlEventTouchDragExit];
     
     _hostLabel = [[UILabel alloc] init];
-    _hostLabel.textColor = [UIColor whiteColor];
+    _hostLabel.textColor = MLTextColor();
     
     _hostOverlay = [[UIImageView alloc] initWithFrame:CGRectMake(self.frame.size.width / 3, _hostIcon.frame.size.height / 4, _hostIcon.frame.size.width / 3, self.frame.size.height / 3)];
     _hostSpinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
     [_hostSpinner setFrame:_hostOverlay.frame];
     _hostSpinner.userInteractionEnabled = NO;
     _hostSpinner.hidesWhenStopped = YES;
+    _hostSpinner.color = MLAccentColor();
+
+    self.isAccessibilityElement = YES;
 
     [self addSubview:_hostLabel];
     [self addSubview:_hostIcon];
@@ -88,9 +111,9 @@ static const int LABEL_DY = 20;
 }
 
 - (void) hostButtonSelected:(id)sender {
-    _hostIcon.layer.opacity = 0.5f;
-    _hostSpinner.layer.opacity = 0.5f;
-    _hostOverlay.layer.opacity = 0.5f;
+    _hostIcon.layer.opacity = 0.72f;
+    _hostSpinner.layer.opacity = 0.72f;
+    _hostOverlay.layer.opacity = 0.72f;
 }
 - (void) hostButtonDeselected:(id)sender {
     _hostIcon.layer.opacity = 1.0f;
@@ -106,8 +129,12 @@ static const int LABEL_DY = 20;
     
     [_hostLabel setText:@"Add Host Manually"];
     [_hostLabel sizeToFit];
+    _hostLabel.textColor = MLAccentColor();
+    self.accessibilityLabel = _hostLabel.text;
     
-    [_hostOverlay setImage:[UIImage imageNamed:@"AddOverlayIcon"]];
+    if (![self setHostIconSymbol:@"plus" color:MLAccentColor()]) {
+        [_hostOverlay setImage:[UIImage imageNamed:@"AddOverlayIcon"]];
+    }
     
     [self updateBounds];
         
@@ -175,23 +202,36 @@ static const int LABEL_DY = 20;
 - (void) updateContentsForHost:(TemporaryHost*)host {
     _hostLabel.text = _host.name;
     [_hostLabel sizeToFit];
+    self.accessibilityLabel = _host.name;
+    _hostLabel.textColor = host.state == StateOnline ? MLTextColor() : MLSecondaryTextColor();
     
     if (host.state == StateOnline) {
         [_hostSpinner stopAnimating];
 
         if (host.pairState == PairStateUnpaired) {
-            [_hostOverlay setImage:[UIImage imageNamed:@"LockedOverlayIcon"]];
+            if (pairingBadge == nil) {
+                pairingBadge = MLBadgeImage(@"lock.fill", MLPairingColor(), @"LockedOverlayIcon");
+            }
+            [_hostOverlay setImage:pairingBadge];
+            self.accessibilityValue = @"Online, pairing required";
         }
         else {
             [_hostOverlay setImage:nil];
+            self.accessibilityValue = @"Online";
         }
     }
     else if (host.state == StateOffline) {
         [_hostSpinner stopAnimating];
-        [_hostOverlay setImage:[UIImage imageNamed:@"ErrorOverlayIcon"]];
+        if (offlineBadge == nil) {
+            offlineBadge = MLBadgeImage(@"wifi.slash", MLOfflineColor(), @"ErrorOverlayIcon");
+        }
+        [_hostOverlay setImage:offlineBadge];
+        self.accessibilityValue = @"Offline";
     }
     else {
+        [_hostOverlay setImage:nil];
         [_hostSpinner startAnimating];
+        self.accessibilityValue = @"Searching";
     }
     
     [self updateBounds];

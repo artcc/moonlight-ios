@@ -8,8 +8,10 @@
 
 #import "UIAppView.h"
 #import "AppAssetManager.h"
+#import "MoonlightAppearance.h"
 
 static const float REFRESH_CYCLE = 1.0f;
+static const float HIDDEN_APP_ALPHA = 0.55f;
 
 @implementation UIAppView {
     TemporaryApp* _app;
@@ -21,6 +23,7 @@ static const float REFRESH_CYCLE = 1.0f;
 }
 
 static UIImage* noImage;
+static UIImage* runningBadge;
 
 - (id) initWithApp:(TemporaryApp*)app cache:(NSCache*)cache andCallback:(id<AppCallback>)callback {
     self = [super init];
@@ -31,7 +34,12 @@ static UIImage* noImage;
     // Cache the NoAppImage ourselves to avoid
     // having to load it each time
     if (noImage == nil) {
-        noImage = [UIImage imageNamed:@"NoAppImage"];
+        if (@available(iOS 10.0, tvOS 10.0, *)) {
+            noImage = MLCardImage(CGSizeMake(150, 200), 12.0, nil);
+        }
+        else {
+            noImage = [UIImage imageNamed:@"NoAppImage"];
+        }
     }
         
 #if TARGET_OS_TV
@@ -40,7 +48,8 @@ static UIImage* noImage;
     self.frame = CGRectMake(0, 0, 150, 200);
 #endif
     
-    [self setAlpha:app.hidden ? 0.4 : 1.0];
+    [self setAlpha:app.hidden ? HIDDEN_APP_ALPHA : 1.0];
+    self.isAccessibilityElement = YES;
     
     _appImage = [[UIImageView alloc] initWithFrame:self.frame];
     [_appImage setImage:noImage];
@@ -68,6 +77,9 @@ static UIImage* noImage;
 #if TARGET_OS_TV
     _appImage.adjustsImageWhenAncestorFocused = YES;
 #else
+    _appImage.layer.cornerRadius = 12.0;
+    _appImage.clipsToBounds = YES;
+
     // Rasterizing the cell layer increases rendering performance by quite a bit
     // but we want it unrasterized for tvOS where it must be scaled.
     self.layer.shouldRasterize = YES;
@@ -114,6 +126,17 @@ static UIImage* noImage;
 }
 #endif
 
+- (void) updateAccessibilityState {
+    self.accessibilityLabel = _app.name;
+    BOOL running = [_app.id isEqualToString:_app.host.currentGame];
+    if (_app.hidden) {
+        self.accessibilityValue = running ? @"Running, hidden" : @"Hidden";
+    }
+    else {
+        self.accessibilityValue = running ? @"Running" : nil;
+    }
+}
+
 - (void) updateAppImage {
     if (_appOverlay != nil) {
         [_appOverlay removeFromSuperview];
@@ -151,19 +174,22 @@ static UIImage* noImage;
     
     if ([_app.id isEqualToString:_app.host.currentGame]) {
         // Only create the app overlay if needed
-        _appOverlay = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Play"]];
+        if (runningBadge == nil) {
+            runningBadge = MLBadgeImage(@"play.fill", MLAccentColor(), @"Play");
+        }
+        _appOverlay = [[UIImageView alloc] initWithImage:runningBadge];
         _appOverlay.layer.shadowColor = [UIColor blackColor].CGColor;
         _appOverlay.layer.shadowOffset = CGSizeMake(0, 0);
-        _appOverlay.layer.shadowOpacity = 1;
-        _appOverlay.layer.shadowRadius = 4.0;
+        _appOverlay.layer.shadowOpacity = 0.35;
+        _appOverlay.layer.shadowRadius = 3.0;
         _appOverlay.contentMode = UIViewContentModeScaleAspectFit;
     }
     
     if (noAppImage) {
         _appLabel = [[UILabel alloc] init];
-        [_appLabel setTextColor:[UIColor whiteColor]];
+        [_appLabel setTextColor:MLTextColor()];
         [_appLabel setText:_app.name];
-        [_appLabel setFont:[UIFont systemFontOfSize:24]];
+        [_appLabel setFont:[UIFont systemFontOfSize:24 weight:UIFontWeightMedium]];
         [_appLabel setBaselineAdjustment:UIBaselineAdjustmentAlignCenters];
         [_appLabel setTextAlignment:NSTextAlignmentCenter];
         [_appLabel setLineBreakMode:NSLineBreakByWordWrapping];
@@ -179,10 +205,12 @@ static UIImage* noImage;
     [self addSubview:_appLabel];
     [self addSubview:_appOverlay];
 #endif
+
+    [self updateAccessibilityState];
 }
 
 - (void) buttonSelected:(id)sender {
-    _appImage.layer.opacity = 0.5f;
+    _appImage.layer.opacity = 0.72f;
 }
 - (void) buttonDeselected:(id)sender {
     _appImage.layer.opacity = 1.0f;
@@ -225,10 +253,11 @@ static UIImage* noImage;
     // Show no shadow for hidden apps. Because we adjust the opacity of the
     // cells for hidden apps, it makes them look bad when the shadow draws
     // through the app tile.
-    self.superview.layer.shadowOpacity = _app.hidden ? 0.0f : 0.5f;
+    self.superview.layer.shadowOpacity = _app.hidden ? 0.0f : 0.25f;
     
     // Update opacity if neccessary
-    [self setAlpha:_app.hidden ? 0.4 : 1.0];
+    [self setAlpha:_app.hidden ? HIDDEN_APP_ALPHA : 1.0];
+    [self updateAccessibilityState];
     
     // Queue the next refresh cycle
     [self performSelector:@selector(updateLoop) withObject:self afterDelay:REFRESH_CYCLE];

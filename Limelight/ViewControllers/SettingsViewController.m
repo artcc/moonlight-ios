@@ -9,6 +9,7 @@
 #import "SettingsViewController.h"
 #import "TemporarySettings.h"
 #import "DataManager.h"
+#import "MoonlightAppearance.h"
 
 #import <VideoToolbox/VideoToolbox.h>
 #import <AVFoundation/AVFoundation.h>
@@ -133,6 +134,46 @@ BOOL isCustomResolution(CGSize res) {
     if (@available(iOS 13.0, tvOS 13.0, *)) {
         self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
     }
+
+    self.view.backgroundColor = MLSurfaceColor();
+    self.view.tintColor = MLAccentColor();
+    self.resolutionDisplayView.backgroundColor = MLBackgroundColor();
+    self.resolutionDisplayView.layer.borderWidth = 1.0;
+    self.resolutionDisplayView.layer.borderColor = MLBorderColor().CGColor;
+
+    // Keep the existing controls and layout, applying only visual attributes.
+    for (UIView* view in self.scrollView.subviews) {
+        if ([view isKindOfClass:[UILabel class]]) {
+            UILabel* label = (UILabel*)view;
+            label.textColor = MLTextColor();
+            label.font = [UIFont systemFontOfSize:label.font.pointSize weight:UIFontWeightSemibold];
+        }
+        else if ([view isKindOfClass:[UISegmentedControl class]]) {
+            UISegmentedControl* selector = (UISegmentedControl*)view;
+            selector.tintColor = MLAccentColor();
+            if (@available(iOS 13.0, tvOS 13.0, *)) {
+                selector.backgroundColor = MLBackgroundColor();
+                selector.selectedSegmentTintColor = MLAccentColor();
+                UIFont* font = [UIFont systemFontOfSize:[UIFont smallSystemFontSize] weight:UIFontWeightMedium];
+                UIFont* selectedFont = [UIFont systemFontOfSize:[UIFont smallSystemFontSize] weight:UIFontWeightSemibold];
+                [selector setTitleTextAttributes:@{NSForegroundColorAttributeName: MLTextColor(),
+                                                   NSFontAttributeName: font} forState:UIControlStateNormal];
+                [selector setTitleTextAttributes:@{NSForegroundColorAttributeName: MLBackgroundColor(),
+                                                   NSFontAttributeName: selectedFont} forState:UIControlStateSelected];
+                [selector setTitleTextAttributes:@{NSForegroundColorAttributeName: MLSecondaryTextColor(),
+                                                   NSFontAttributeName: font} forState:UIControlStateDisabled];
+                [selector setTitleTextAttributes:@{NSForegroundColorAttributeName: [MLBackgroundColor() colorWithAlphaComponent:0.7],
+                                                   NSFontAttributeName: selectedFont} forState:UIControlStateSelected | UIControlStateDisabled];
+            }
+        }
+        else if ([view isKindOfClass:[UISlider class]]) {
+            UISlider* slider = (UISlider*)view;
+            slider.minimumTrackTintColor = MLAccentColor();
+            slider.maximumTrackTintColor = MLBorderColor();
+            slider.thumbTintColor = MLTextColor();
+        }
+    }
+    self.bitrateSlider.accessibilityLabel = @"Bitrate";
     
     DataManager* dataMan = [[DataManager alloc] init];
     TemporarySettings* currentSettings = [dataMan getSettings];
@@ -443,12 +484,15 @@ BOOL isCustomResolution(CGSize res) {
     }
     UILabel *label1 = [[UILabel alloc] init];
     label1.text = @"Set PC/Game resolution: ";
+    label1.textColor = MLSecondaryTextColor();
     label1.font = [UIFont systemFontOfSize:fontSize];
     [label1 sizeToFit];
     label1.frame = CGRectMake(padding, (viewFrameHeight - label1.frame.size.height) / 2, label1.frame.size.width, label1.frame.size.height);
 
     UILabel *label2 = [[UILabel alloc] init];
     label2.text = [NSString stringWithFormat:@"%ld x %ld", (long)width, (long)height];
+    label2.textColor = MLAccentColor();
+    label2.font = [UIFont monospacedDigitSystemFontOfSize:label2.font.pointSize weight:UIFontWeightSemibold];
     [label2 sizeToFit];
     label2.frame = CGRectMake(viewFrameWidth - label2.frame.size.width - padding, (viewFrameHeight - label2.frame.size.height) / 2, label2.frame.size.width, label2.frame.size.height);
 
@@ -464,7 +508,20 @@ BOOL isCustomResolution(CGSize res) {
 
 - (void) updateBitrateText {
     // Display bitrate in Mbps
-    [self.bitrateLabel setText:[NSString stringWithFormat:bitrateFormat, _bitrate / 1000.]];
+    NSString* text = [NSString stringWithFormat:bitrateFormat, _bitrate / 1000.];
+    CGFloat fontSize = self.bitrateLabel.font.pointSize;
+    NSMutableAttributedString* attributedText = [[NSMutableAttributedString alloc] initWithString:text
+                                                                                      attributes:@{NSForegroundColorAttributeName: MLSecondaryTextColor(),
+                                                                                                   NSFontAttributeName: [UIFont systemFontOfSize:fontSize weight:UIFontWeightRegular]}];
+    NSRange separator = [text rangeOfString:@": "];
+    if (separator.location != NSNotFound) {
+        NSUInteger valueStart = NSMaxRange(separator);
+        [attributedText addAttributes:@{NSForegroundColorAttributeName: MLAccentColor(),
+                                        NSFontAttributeName: [UIFont monospacedDigitSystemFontOfSize:fontSize weight:UIFontWeightSemibold]}
+                                range:NSMakeRange(valueStart, text.length - valueStart)];
+    }
+    self.bitrateLabel.attributedText = attributedText;
+    self.bitrateSlider.accessibilityValue = [NSString stringWithFormat:@"%.1f Mbps", _bitrate / 1000.];
 }
 
 - (NSInteger) getChosenFrameRate {

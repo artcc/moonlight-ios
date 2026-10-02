@@ -26,6 +26,7 @@
 #import "TemporaryApp.h"
 #import "IdManager.h"
 #import "ConnectionHelper.h"
+#import "MoonlightAppearance.h"
 
 #if !TARGET_OS_TV
 #import "SettingsViewController.h"
@@ -116,15 +117,34 @@ static NSMutableSet* hostList;
     });
 }
 
+- (UIImage*)navigationIconNamed:(NSString*)symbolName {
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+#if TARGET_OS_TV
+        CGFloat pointSize = 28.0;
+#else
+        CGFloat pointSize = 20.0;
+#endif
+        UIImageSymbolConfiguration* configuration = [UIImageSymbolConfiguration configurationWithPointSize:pointSize
+                                                                                                    weight:UIImageSymbolWeightMedium];
+        return [UIImage systemImageNamed:symbolName withConfiguration:configuration];
+    }
+    return nil;
+}
+
 - (void)disableUpButton {
 #if !TARGET_OS_TV
+    [self->_upButton setImage:nil];
     [self->_upButton setTitle:nil];
+    self->_upButton.accessibilityLabel = nil;
 #endif
 }
 
 - (void)enableUpButton {
 #if !TARGET_OS_TV
-    [self->_upButton setTitle:@"Select New Host"];
+    UIImage* image = [self navigationIconNamed:@"desktopcomputer"];
+    [self->_upButton setImage:image];
+    [self->_upButton setTitle:image == nil ? @"Select New Host" : nil];
+    self->_upButton.accessibilityLabel = @"Select New Host";
 #endif
 }
 
@@ -922,6 +942,40 @@ static NSMutableSet* hostList;
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+
+    self.view.backgroundColor = MLBackgroundColor();
+    self.view.tintColor = MLAccentColor();
+    _settingsButton.tintColor = MLAccentColor();
+    _settingsButton.accessibilityLabel = @"Settings";
+    UIImage* settingsImage = [self navigationIconNamed:@"gearshape"];
+    if (settingsImage != nil) {
+        _settingsButton.image = settingsImage;
+        _settingsButton.title = nil;
+    }
+#if !TARGET_OS_TV
+    _upButton.tintColor = MLAccentColor();
+#endif
+
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
+        [appearance configureWithOpaqueBackground];
+        appearance.backgroundColor = MLBackgroundColor();
+        appearance.shadowColor = [UIColor clearColor];
+#if TARGET_OS_TV
+        CGFloat titleFontSize = 38.0;
+#else
+        CGFloat titleFontSize = 17.0;
+#endif
+        appearance.titleTextAttributes = @{NSForegroundColorAttributeName: MLTextColor(),
+                                           NSFontAttributeName: [UIFont systemFontOfSize:titleFontSize weight:UIFontWeightSemibold]};
+        // Scope the appearance to the browser rather than the shared navigation bar.
+        self.navigationItem.standardAppearance = appearance;
+        self.navigationItem.scrollEdgeAppearance = appearance;
+        self.navigationItem.compactAppearance = appearance;
+        if (@available(iOS 15.0, tvOS 15.0, *)) {
+            self.navigationItem.compactScrollEdgeAppearance = appearance;
+        }
+    }
         
 #if !TARGET_OS_TV
     // Set the side bar button action. When it's tapped, it'll show the sidebar.
@@ -1360,15 +1414,21 @@ static NSMutableSet* hostList;
     
     // Shadow opacity is controlled inside UIAppView based on whether the app
     // is hidden or not during the update cycle.
+#if TARGET_OS_TV
     UIBezierPath *shadowPath = [UIBezierPath bezierPathWithRect:cell.bounds];
+#else
+    UIBezierPath *shadowPath = [UIBezierPath bezierPathWithRoundedRect:cell.bounds cornerRadius:12.0f * cell.bounds.size.width / 150.0f];
+#endif
     cell.layer.masksToBounds = NO;
     cell.layer.shadowColor = [UIColor blackColor].CGColor;
-    cell.layer.shadowOffset = CGSizeMake(1.0f, 5.0f);
+    cell.layer.shadowOffset = CGSizeMake(0.0f, 4.0f);
+    cell.layer.shadowRadius = 8.0f;
     cell.layer.shadowPath = shadowPath.CGPath;
     
 #if !TARGET_OS_TV
-    cell.layer.borderWidth = 1;
-    cell.layer.borderColor = [[UIColor colorWithRed:0 green:0 blue:0 alpha:0.3f] CGColor];
+    appView.layer.cornerRadius = 12.0f;
+    appView.layer.borderWidth = 1.0f;
+    appView.layer.borderColor = MLBorderColor().CGColor;
     cell.exclusiveTouch = YES;
 #endif
 
