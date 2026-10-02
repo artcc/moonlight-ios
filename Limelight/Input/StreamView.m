@@ -14,6 +14,7 @@
 #import "RelativeTouchHandler.h"
 #import "AbsoluteTouchHandler.h"
 #import "KeyboardInputField.h"
+#import "MoonlightAppearance.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
@@ -60,6 +61,9 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     [keyInputField setAutocorrectionType:UITextAutocorrectionTypeNo];
     [keyInputField setAutocapitalizationType:UITextAutocapitalizationTypeNone];
     [keyInputField setSpellCheckingType:UITextSpellCheckingTypeNo];
+#if !TARGET_OS_TV
+    keyInputField.keyboardAppearance = UIKeyboardAppearanceDark;
+#endif
     [self addSubview:keyInputField];
     
 #if TARGET_OS_TV
@@ -364,15 +368,30 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 #if !TARGET_OS_TV
                 // Prepare the toolbar above the keyboard for more options
                 UIToolbar *customToolbarView = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.bounds.size.width, 44)];
+                customToolbarView.tintColor = MLAccentColor();
+                customToolbarView.barTintColor = MLSurfaceColor();
+                customToolbarView.translucent = NO;
+                if (@available(iOS 13.0, *)) {
+                    UIToolbarAppearance* appearance = [[UIToolbarAppearance alloc] init];
+                    [appearance configureWithOpaqueBackground];
+                    appearance.backgroundColor = MLSurfaceColor();
+                    appearance.shadowColor = MLBorderColor();
+                    customToolbarView.standardAppearance = appearance;
+                    customToolbarView.compactAppearance = appearance;
+                    if (@available(iOS 15.0, *)) {
+                        customToolbarView.scrollEdgeAppearance = appearance;
+                        customToolbarView.compactScrollEdgeAppearance = appearance;
+                    }
+                }
                 
-                UIBarButtonItem *doneBarButton = [self createButtonWithImageNamed:@"DoneIcon.png" backgroundColor:[UIColor clearColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0x00 isToggleable:NO];
-                UIBarButtonItem *windowsBarButton = [self createButtonWithImageNamed:@"WindowsIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES];
-                UIBarButtonItem *tabBarButton = [self createButtonWithImageNamed:@"TabIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO];
-                UIBarButtonItem *shiftBarButton = [self createButtonWithImageNamed:@"ShiftIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES];
-                UIBarButtonItem *escapeBarButton = [self createButtonWithImageNamed:@"EscapeIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO];
-                UIBarButtonItem *controlBarButton = [self createButtonWithImageNamed:@"ControlIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES];
-                UIBarButtonItem *altBarButton = [self createButtonWithImageNamed:@"AltIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES];
-                UIBarButtonItem *deleteBarButton = [self createButtonWithImageNamed:@"DeleteIcon.png" backgroundColor:[UIColor blackColor] target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO];
+                UIBarButtonItem *doneBarButton = [self createButtonWithImageNamed:@"DoneIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0x00 isToggleable:NO];
+                UIBarButtonItem *windowsBarButton = [self createButtonWithImageNamed:@"WindowsIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0x5B isToggleable:YES];
+                UIBarButtonItem *tabBarButton = [self createButtonWithImageNamed:@"TabIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0x09 isToggleable:NO];
+                UIBarButtonItem *shiftBarButton = [self createButtonWithImageNamed:@"ShiftIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0xA0 isToggleable:YES];
+                UIBarButtonItem *escapeBarButton = [self createButtonWithImageNamed:@"EscapeIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0x1B isToggleable:NO];
+                UIBarButtonItem *controlBarButton = [self createButtonWithImageNamed:@"ControlIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0xA2 isToggleable:YES];
+                UIBarButtonItem *altBarButton = [self createButtonWithImageNamed:@"AltIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0xA4 isToggleable:YES];
+                UIBarButtonItem *deleteBarButton = [self createButtonWithImageNamed:@"DeleteIcon.png" backgroundColor:MLSurfaceColor() target:self action:@selector(toolbarButtonClicked:) keyCode:0x2E isToggleable:NO];
                 UIBarButtonItem *flexibleSpace = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
                 
                 [customToolbarView setItems:[NSArray arrayWithObjects:doneBarButton, windowsBarButton, escapeBarButton, tabBarButton, shiftBarButton, controlBarButton, altBarButton, deleteBarButton, flexibleSpace, nil]];
@@ -392,12 +411,31 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 
 - (UIBarButtonItem *)createButtonWithImageNamed:(NSString *)imageName backgroundColor:(UIColor *)backgroundColor target:(id)target action:(SEL)action keyCode:(NSInteger)keyCode isToggleable:(BOOL)isToggleable {
     UIImage *image = [UIImage imageNamed:imageName];
+    NSDictionary* symbols = @{@"DoneIcon.png": @"checkmark", @"WindowsIcon.png": @"square.grid.2x2",
+                               @"TabIcon.png": @"arrow.right.to.line", @"ShiftIcon.png": @"shift",
+                               @"EscapeIcon.png": @"escape", @"ControlIcon.png": @"control",
+                               @"AltIcon.png": @"option", @"DeleteIcon.png": @"delete.right"};
+    NSDictionary* labels = @{@"DoneIcon.png": @"Hide keyboard", @"WindowsIcon.png": @"Windows key",
+                              @"TabIcon.png": @"Tab", @"ShiftIcon.png": @"Shift", @"EscapeIcon.png": @"Escape",
+                              @"ControlIcon.png": @"Control", @"AltIcon.png": @"Alt", @"DeleteIcon.png": @"Delete"};
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIImageSymbolConfiguration* configuration = [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightMedium];
+        NSString* symbolName = symbols[imageName];
+        UIImage* symbol = symbolName == nil ? nil : [UIImage systemImageNamed:symbolName withConfiguration:configuration];
+        if (symbol != nil) {
+            image = symbol;
+        }
+    }
     UIButton *button = [UIButton buttonWithType:UIButtonTypeCustom];
     [button setImage:image forState:UIControlStateNormal];
     button.frame = CGRectMake(0, 0, 30, 30);
     button.imageView.contentMode = UIViewContentModeScaleAspectFit;
-    button.imageView.backgroundColor = backgroundColor;
-    button.imageView.layer.cornerRadius = 10.0;
+    button.backgroundColor = backgroundColor;
+    button.tintColor = MLTextColor();
+    button.layer.cornerRadius = 8.0;
+    button.layer.borderWidth = 0.5;
+    button.layer.borderColor = MLBorderColor().CGColor;
+    button.accessibilityLabel = labels[imageName];
     button.imageEdgeInsets = UIEdgeInsetsMake(6, 6, 6, 6);
     [button addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
     objc_setAssociatedObject(button, "keyCode", @(keyCode), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -414,9 +452,11 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
         isOn = !isOn;
         // Update the button's appearance based on its new state
         if (isOn) {
-            sender.imageView.backgroundColor = [UIColor lightGrayColor];
+            sender.backgroundColor = MLAccentColor();
+            sender.tintColor = MLBackgroundColor();
         } else {
-            sender.imageView.backgroundColor = [UIColor blackColor];
+            sender.backgroundColor = MLSurfaceColor();
+            sender.tintColor = MLTextColor();
         }
     }
     // Update the new on/off state of the button

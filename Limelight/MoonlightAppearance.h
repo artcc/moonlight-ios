@@ -33,6 +33,14 @@ static inline UIColor* MLOfflineColor(void) {
     return [UIColor colorWithRed:0.98 green:0.50 blue:0.56 alpha:1.0];
 }
 
+// Apply after adding all actions and fields so UIKit owns the alert's layout.
+static inline void MLStyleDialog(UIAlertController* dialog) {
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        dialog.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    }
+    dialog.view.tintColor = MLAccentColor();
+}
+
 // Bake the surface into the image so tvOS can apply its native image focus effect.
 static inline UIImage* MLCardImage(CGSize size, CGFloat cornerRadius, UIImage* symbol) API_AVAILABLE(ios(10.0), tvos(10.0)) {
     UIGraphicsImageRenderer* renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size];

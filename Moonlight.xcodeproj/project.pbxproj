@@ -46,6 +46,8 @@
 		A8B420022FCE100000000001 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A8B420022FCE100000000002 /* LaunchScreen.storyboard */; };
 		A8B420032FCE100000000002 /* background.png in Resources */ = {isa = PBXBuildFile; fileRef = A8B420032FCE100000000001 /* background.png */; };
 		A8B420032FCE100000000004 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = A8B420032FCE100000000003 /* logo.png */; };
+		A8B420042FCE100000000001 /* background.png in Resources */ = {isa = PBXBuildFile; fileRef = A8B420032FCE100000000001 /* background.png */; };
+		A8B420042FCE100000000002 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = A8B420032FCE100000000003 /* logo.png */; };
 		DC1F5A07206436B20037755F /* ConnectionHelper.m in Sources */ = {isa = PBXBuildFile; fileRef = DC1F5A06206436B20037755F /* ConnectionHelper.m */; };
 		F74BEF9C2C1A705600224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEF9B2C1A705600224667 /* OpenSSL */; };
 		F74BEFA42C1A80E400224667 /* OpenSSL in Frameworks */ = {isa = PBXBuildFile; productRef = F74BEFA32C1A80E400224667 /* OpenSSL */; };
@@ -841,6 +843,8 @@
 				FB290E7B19B38036004C83CF /* iPhone.storyboard in Resources */,
 				FB290D0919B2C406004C83CF /* Images.xcassets in Resources */,
 				FB89463819F6473800339C8A /* Launch Screen.xib in Resources */,
+				A8B420042FCE100000000001 /* background.png in Resources */,
+				A8B420042FCE100000000002 /* logo.png in Resources */,
 				80D8D562306F88EA001B85C8 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

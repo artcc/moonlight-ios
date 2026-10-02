@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="15505" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES">
-    <device id="retina6_1" orientation="landscape" appearance="light"/>
+    <device id="retina6_1" orientation="landscape" appearance="dark"/>
     <dependencies>
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="15509"/>
@@ -12,8 +12,34 @@
         <view contentMode="scaleToFill" id="VWy-YH-qYj">
             <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
             <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
-            <color key="backgroundColor" white="0.33333333329999998" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+            <subviews>
+                <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="background.png" translatesAutoresizingMaskIntoConstraints="NO" id="Lch-bg-ios">
+                    <rect key="frame" x="0.0" y="0.0" width="896" height="414"/>
+                </imageView>
+                <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="logo.png" translatesAutoresizingMaskIntoConstraints="NO" id="Lch-lg-ios">
+                    <rect key="frame" x="223.75" y="72.45" width="448.5" height="269.1"/>
+                    <constraints>
+                        <constraint firstAttribute="width" relation="lessThanOrEqual" constant="512" id="Lch-lw-ios"/>
+                        <constraint firstAttribute="height" secondItem="Lch-lg-ios" secondAttribute="width" multiplier="0.6" id="Lch-lh-ios"/>
+                    </constraints>
+                </imageView>
+            </subviews>
+            <color key="backgroundColor" red="0.05" green="0.07" blue="0.11" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <constraints>
+                <constraint firstItem="Lch-bg-ios" firstAttribute="leading" secondItem="VWy-YH-qYj" secondAttribute="leading" id="Lch-bl-ios"/>
+                <constraint firstAttribute="trailing" secondItem="Lch-bg-ios" secondAttribute="trailing" id="Lch-br-ios"/>
+                <constraint firstItem="Lch-bg-ios" firstAttribute="top" secondItem="VWy-YH-qYj" secondAttribute="top" id="Lch-bt-ios"/>
+                <constraint firstAttribute="bottom" secondItem="Lch-bg-ios" secondAttribute="bottom" id="Lch-bb-ios"/>
+                <constraint firstItem="Lch-lg-ios" firstAttribute="centerX" secondItem="VWy-YH-qYj" secondAttribute="centerX" id="Lch-lx-ios"/>
+                <constraint firstItem="Lch-lg-ios" firstAttribute="centerY" secondItem="VWy-YH-qYj" secondAttribute="centerY" id="Lch-ly-ios"/>
+                <constraint firstItem="Lch-lg-ios" firstAttribute="width" secondItem="VWy-YH-qYj" secondAttribute="width" multiplier="0.63" priority="750" id="Lch-wp-ios"/>
+                <constraint firstItem="Lch-lg-ios" firstAttribute="height" relation="lessThanOrEqual" secondItem="VWy-YH-qYj" secondAttribute="height" multiplier="0.65" id="Lch-hp-ios"/>
+            </constraints>
             <point key="canvasLocation" x="33" y="187"/>
         </view>
     </objects>
+    <resources>
+        <image name="background.png" width="1254" height="1254"/>
+        <image name="logo.png" width="1280" height="768"/>
+    </resources>
 </document>

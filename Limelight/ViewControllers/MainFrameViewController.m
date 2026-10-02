@@ -53,6 +53,10 @@
     FrontViewPosition currentPosition;
     NSArray* _sortedAppList;
     NSCache* _boxArtCache;
+    UIView* _emptyStateView;
+    UIImageView* _emptyStateIcon;
+    UILabel* _emptyStateTitle;
+    UILabel* _emptyStateMessage;
     bool _background;
 #if TARGET_OS_TV
     UITapGestureRecognizer* _menuRecognizer;
@@ -64,9 +68,15 @@ static NSMutableSet* hostList;
     // Needs to be synchronous to ensure the alert is shown before any potential
     // failure callback could be invoked.
     dispatch_sync(dispatch_get_main_queue(), ^{
-        self->_pairAlert = [UIAlertController alertControllerWithTitle:@"Pairing"
-                                                               message:[NSString stringWithFormat:@"Enter the following PIN on the host machine: %@\n\nIf your host PC is running Sunshine, navigate to the Sunshine web UI to enter the PIN.", PIN]
-                                                        preferredStyle:UIAlertControllerStyleAlert];
+        // Display-only formatting: the PIN used by PairManager is unchanged.
+        NSMutableArray<NSString*>* digits = [NSMutableArray arrayWithCapacity:PIN.length];
+        for (NSUInteger i = 0; i < PIN.length; i++) {
+            [digits addObject:[PIN substringWithRange:NSMakeRange(i, 1)]];
+        }
+        NSString* title = [NSString stringWithFormat:@"Pairing PIN\n%@", [digits componentsJoinedByString:@"\u2007"]];
+        self->_pairAlert = [UIAlertController alertControllerWithTitle:title
+                                                               message:@"Enter this PIN on your gaming PC.\n\nIf you use Sunshine, enter it in the Sunshine web interface."
+                                                         preferredStyle:UIAlertControllerStyleAlert];
         [self->_pairAlert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
             self->_pairAlert = nil;
             [self->_discMan startDiscovery];
@@ -74,6 +84,7 @@ static NSMutableSet* hostList;
                 [self showHostSelectionView];
             }];
         }]];
+        MLStyleDialog(self->_pairAlert);
         [[self activeViewController] presentViewController:self->_pairAlert animated:YES completion:nil];
     });
 }
@@ -89,6 +100,7 @@ static NSMutableSet* hostList;
     
     [self hideLoadingFrame: ^{
         [self showHostSelectionView];
+        MLStyleDialog(failedDialog);
         [[self activeViewController] presentViewController:failedDialog animated:YES completion:nil];
     }];
 }
@@ -143,8 +155,8 @@ static NSMutableSet* hostList;
 #if !TARGET_OS_TV
     UIImage* image = [self navigationIconNamed:@"desktopcomputer"];
     [self->_upButton setImage:image];
-    [self->_upButton setTitle:image == nil ? @"Select New Host" : nil];
-    self->_upButton.accessibilityLabel = @"Select New Host";
+    [self->_upButton setTitle:image == nil ? @"Select New PC" : nil];
+    self->_upButton.accessibilityLabel = @"Select New PC";
 #endif
 }
 
@@ -152,11 +164,8 @@ static NSMutableSet* hostList;
     if (_selectedHost != nil) {
         self.title = _selectedHost.name;
     }
-    else if ([hostList count] == 0) {
-        self.title = @"Searching for PCs on your network...";
-    }
     else {
-        self.title = @"Select Host";
+        self.title = @"Your PCs";
     }
 }
 
@@ -207,6 +216,7 @@ static NSMutableSet* hostList;
                 [applistAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
                 [self hideLoadingFrame: ^{
                     [self showHostSelectionView];
+                    MLStyleDialog(applistAlert);
                     [[self activeViewController] presentViewController:applistAlert animated:YES completion:nil];
                 }];
                 host.state = StateOffline;
@@ -324,6 +334,7 @@ static NSMutableSet* hostList;
     
     [self.collectionView reloadData];
     [self.view addSubview:hostScrollView];
+    [self updateEmptyState];
 }
 
 - (void) receivedAssetForApp:(TemporaryApp*)app {
@@ -342,6 +353,7 @@ static NSMutableSet* hostList;
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [Utils addHelpOptionToDialog:alert];
     [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    MLStyleDialog(alert);
     [[self activeViewController] presentViewController:alert animated:YES completion:nil];
 }
 
@@ -421,6 +433,7 @@ static NSMutableSet* hostList;
                     [self hideLoadingFrame: ^{
                         [self showHostSelectionView];
                         if (view != nil) {
+                            MLStyleDialog(applistAlert);
                             [[self activeViewController] presentViewController:applistAlert animated:YES completion:nil];
                         }
                     }];
@@ -504,6 +517,7 @@ static NSMutableSet* hostList;
                 });
                 wolAlert.message = @"Successfully sent wake-up request. It may take a few moments for the PC to wake. If it never wakes up, ensure it's properly configured for Wake-on-LAN.";
             }
+            MLStyleDialog(wolAlert);
             [[self activeViewController] presentViewController:wolAlert animated:YES completion:nil];
         }]];
     }
@@ -544,6 +558,7 @@ static NSMutableSet* hostList;
                         
                         UIAlertController* netTestAlert = [UIAlertController alertControllerWithTitle:@"Network Test Complete" message:message preferredStyle:UIAlertControllerStyleAlert];
                         [netTestAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+                        MLStyleDialog(netTestAlert);
                         [[self activeViewController] presentViewController:netTestAlert animated:YES completion:nil];
                     }];
                 });
@@ -560,7 +575,7 @@ static NSMutableSet* hostList;
         }]];
     }
 #endif
-    [longClickAlert addAction:[UIAlertAction actionWithTitle:@"Remove Host" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
+    [longClickAlert addAction:[UIAlertAction actionWithTitle:@"Remove PC" style:UIAlertActionStyleDestructive handler:^(UIAlertAction* action) {
         [self->_discMan removeHostFromDiscovery:host];
         DataManager* dataMan = [[DataManager alloc] init];
         [dataMan removeHost:host];
@@ -576,14 +591,17 @@ static NSMutableSet* hostList;
     longClickAlert.popoverPresentationController.sourceView = view;
     
     longClickAlert.popoverPresentationController.sourceRect = CGRectMake(view.bounds.size.width / 2.0, view.bounds.size.height / 2.0, 1.0, 1.0); // center of the view
+    MLStyleDialog(longClickAlert);
     [[self activeViewController] presentViewController:longClickAlert animated:YES completion:nil];
 }
 
 - (void) addHostClicked {
     Log(LOG_D, @"Clicked add host");
-    UIAlertController* alertController = [UIAlertController alertControllerWithTitle:@"Add Host Manually" message:@"If Moonlight doesn't find your local gaming PC automatically,\nenter the IP address of your PC" preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController* alertController = [UIAlertController alertControllerWithTitle:@"Add PC Manually"
+                                                                            message:@"Enter your gaming PC's IP address or hostname, such as gaming-pc.local."
+                                                                     preferredStyle:UIAlertControllerStyleAlert];
     [alertController addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
+    [alertController addAction:[UIAlertAction actionWithTitle:@"Add PC" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
         NSString* hostAddress = [((UITextField*)[[alertController textFields] objectAtIndex:0]).text trim];
         [self showLoadingFrame:^{
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
@@ -604,11 +622,12 @@ static NSMutableSet* hostList;
                             error = [error stringByAppendingString:@"\n\nYour device's network connection is blocking Moonlight. Streaming may not work while connected to this network."];
                         }
                         
-                        UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"Add Host Manually" message:error preferredStyle:UIAlertControllerStyleAlert];
+                        UIAlertController* hostNotFoundAlert = [UIAlertController alertControllerWithTitle:@"Couldn't Add PC" message:error preferredStyle:UIAlertControllerStyleAlert];
                         [Utils addHelpOptionToDialog:hostNotFoundAlert];
                         [hostNotFoundAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
                         dispatch_async(dispatch_get_main_queue(), ^{
                             [self hideLoadingFrame:^{
+                                MLStyleDialog(hostNotFoundAlert);
                                 [[self activeViewController] presentViewController:hostNotFoundAlert animated:YES completion:nil];
                             }];
                         });
@@ -617,7 +636,25 @@ static NSMutableSet* hostList;
             });
         }];
     }]];
-    [alertController addTextFieldWithConfigurationHandler:nil];
+    [alertController addTextFieldWithConfigurationHandler:^(UITextField* textField) {
+        textField.tintColor = MLAccentColor();
+        // Preserve UIKit's native field colors, including tvOS focus styling.
+        textField.placeholder = @"192.168.1.100";
+        textField.accessibilityLabel = @"PC IP address or hostname";
+        textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        textField.autocorrectionType = UITextAutocorrectionTypeNo;
+        textField.spellCheckingType = UITextSpellCheckingTypeNo;
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+#if !TARGET_OS_TV
+        textField.keyboardType = UIKeyboardTypeASCIICapable;
+        textField.keyboardAppearance = UIKeyboardAppearanceDark;
+#endif
+        if (@available(iOS 11.0, tvOS 11.0, *)) {
+            textField.smartDashesType = UITextSmartDashesTypeNo;
+            textField.smartQuotesType = UITextSmartQuotesTypeNo;
+        }
+    }];
+    MLStyleDialog(alertController);
     [[self activeViewController] presentViewController:alertController animated:YES completion:nil];
 }
 
@@ -811,6 +848,7 @@ static NSMutableSet* hostList;
                                                     dispatch_async(dispatch_get_main_queue(), ^{
                                                         [self updateAppsForHost:app.host];
                                                         [self hideLoadingFrame: ^{
+                                                            MLStyleDialog(alert);
                                                             [[self activeViewController] presentViewController:alert animated:YES completion:nil];
                                                         }];
                                                     });
@@ -855,6 +893,7 @@ static NSMutableSet* hostList;
     alertController.popoverPresentationController.sourceView = view;
     
     alertController.popoverPresentationController.sourceRect = CGRectMake(view.bounds.size.width / 2.0, view.bounds.size.height / 2.0, 1.0, 1.0); // center of the view
+    MLStyleDialog(alertController);
     [[self activeViewController] presentViewController:alertController animated:YES completion:nil];
 }
 
@@ -937,6 +976,12 @@ static NSMutableSet* hostList;
     
     [self adjustScrollViewForSafeArea:self.collectionView];
     [self adjustScrollViewForSafeArea:self->hostScrollView];
+    [self layoutEmptyState];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutEmptyState];
 }
 
 - (void)viewDidLoad
@@ -957,6 +1002,7 @@ static NSMutableSet* hostList;
 #endif
 
     if (@available(iOS 13.0, tvOS 13.0, *)) {
+        self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
         UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
         [appearance configureWithOpaqueBackground];
         appearance.backgroundColor = MLBackgroundColor();
@@ -1038,6 +1084,7 @@ static NSMutableSet* hostList;
     hostScrollView.delaysContentTouches = NO;
     
     self.collectionView.delaysContentTouches = NO;
+    self.collectionView.indicatorStyle = UIScrollViewIndicatorStyleWhite;
     self.collectionView.allowsMultipleSelection = NO;
 #if !TARGET_OS_TV
     self.collectionView.multipleTouchEnabled = NO;
@@ -1309,6 +1356,7 @@ static NSMutableSet* hostList;
     
     [hostScrollView addSubview:addComp];
     [hostScrollView setContentSize:CGSizeMake(prevEdge + addComp.frame.size.width, hostScrollView.frame.size.height)];
+    [self updateEmptyState];
 }
 
 - (float) getCompViewX:(UIComputerView*)comp addComp:(UIComputerView*)addComp prevEdge:(float)prevEdge {
@@ -1395,6 +1443,99 @@ static NSMutableSet* hostList;
     
     [hostScrollView removeFromSuperview];
     [self.collectionView reloadData];
+    [self updateEmptyState];
+}
+
+- (void)updateEmptyState {
+    BOOL searching;
+    @synchronized (hostList) {
+        searching = _selectedHost == nil && hostList.count == 0;
+    }
+    BOOL emptyLibrary = _selectedHost != nil && _sortedAppList != nil && _sortedAppList.count == 0;
+    if (!searching && !emptyLibrary) {
+        self.collectionView.backgroundView = nil;
+        return;
+    }
+
+    if (_emptyStateView == nil) {
+        _emptyStateView = [[UIView alloc] initWithFrame:self.collectionView.bounds];
+        _emptyStateView.userInteractionEnabled = NO;
+        _emptyStateIcon = [[UIImageView alloc] init];
+        _emptyStateIcon.contentMode = UIViewContentModeScaleAspectFit;
+        _emptyStateIcon.tintColor = MLAccentColor();
+        _emptyStateIcon.isAccessibilityElement = NO;
+        _emptyStateTitle = [[UILabel alloc] init];
+        _emptyStateTitle.textAlignment = NSTextAlignmentCenter;
+        _emptyStateTitle.textColor = MLTextColor();
+        _emptyStateTitle.numberOfLines = 0;
+        _emptyStateMessage = [[UILabel alloc] init];
+        _emptyStateMessage.textAlignment = NSTextAlignmentCenter;
+        _emptyStateMessage.textColor = MLSecondaryTextColor();
+        _emptyStateMessage.numberOfLines = 0;
+#if TARGET_OS_TV
+        _emptyStateTitle.font = [UIFont systemFontOfSize:34.0 weight:UIFontWeightSemibold];
+        _emptyStateMessage.font = [UIFont systemFontOfSize:25.0];
+#else
+        _emptyStateTitle.font = [UIFont systemFontOfSize:20.0 weight:UIFontWeightSemibold];
+        _emptyStateMessage.font = [UIFont systemFontOfSize:15.0];
+#endif
+        [_emptyStateView addSubview:_emptyStateIcon];
+        [_emptyStateView addSubview:_emptyStateTitle];
+        [_emptyStateView addSubview:_emptyStateMessage];
+    }
+
+    _emptyStateIcon.hidden = searching;
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        _emptyStateIcon.image = [UIImage systemImageNamed:@"gamecontroller"];
+    }
+    if (searching) {
+        _emptyStateTitle.text = @"Searching for PCs";
+        _emptyStateMessage.text = @"PCs appear here automatically. You can also add one manually.";
+    }
+    else if (_selectedHost.appList.count > 0 && !_showHiddenApps) {
+        _emptyStateTitle.text = @"No visible apps";
+        _emptyStateMessage.text = @"Use View All Apps in the PC menu to see your hidden apps.";
+    }
+    else {
+        _emptyStateTitle.text = @"No apps available";
+        _emptyStateMessage.text = @"This PC has not provided any apps. Check its streaming server configuration.";
+    }
+    self.collectionView.backgroundView = _emptyStateView;
+    [self layoutEmptyState];
+}
+
+- (void)layoutEmptyState {
+    if (_emptyStateView == nil || self.collectionView.backgroundView != _emptyStateView) {
+        return;
+    }
+    CGRect bounds = _emptyStateView.bounds;
+    if (@available(iOS 11.0, tvOS 11.0, *)) {
+        bounds = UIEdgeInsetsInsetRect(bounds, self.collectionView.safeAreaInsets);
+    }
+#if TARGET_OS_TV
+    CGFloat width = MIN(1000.0, MAX(1.0, bounds.size.width - 80.0));
+    CGFloat iconSize = 80.0;
+    CGFloat gap = 20.0;
+#else
+    CGFloat width = MIN(420.0, MAX(1.0, bounds.size.width - 40.0));
+    CGFloat iconSize = 48.0;
+    CGFloat gap = 12.0;
+#endif
+    CGSize titleSize = [_emptyStateTitle sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
+    CGSize messageSize = [_emptyStateMessage sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
+    BOOL searching = _selectedHost == nil;
+    CGFloat iconHeight = searching || _emptyStateIcon.image == nil ? 0.0 : iconSize + gap;
+    CGFloat height = iconHeight + titleSize.height + gap + messageSize.height;
+    CGFloat centerY = searching ? CGRectGetMinY(bounds) + bounds.size.height * 0.8 : CGRectGetMidY(bounds);
+    CGFloat y = MIN(centerY - height / 2, CGRectGetMaxY(bounds) - height);
+    if (searching && hostScrollView.superview != nil) {
+        CGRect hostFrame = [_emptyStateView convertRect:hostScrollView.bounds fromView:hostScrollView];
+        y = MIN(MAX(y, CGRectGetMaxY(hostFrame) + gap), CGRectGetMaxY(bounds) - height);
+    }
+    CGFloat x = CGRectGetMidX(bounds) - width / 2;
+    _emptyStateIcon.frame = CGRectMake(CGRectGetMidX(bounds) - iconSize / 2, y, iconSize, iconSize);
+    _emptyStateTitle.frame = CGRectMake(x, y + iconHeight, width, titleSize.height);
+    _emptyStateMessage.frame = CGRectMake(x, CGRectGetMaxY(_emptyStateTitle.frame) + gap, width, messageSize.height);
 }
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {

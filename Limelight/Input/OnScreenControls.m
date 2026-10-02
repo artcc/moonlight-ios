@@ -10,6 +10,7 @@
 #import "StreamView.h"
 #import "ControllerSupport.h"
 #import "Controller.h"
+#import "MoonlightAppearance.h"
 #include "Limelight.h"
 
 #define UPDATE_BUTTON(x, y) (buttonFlags = \
@@ -69,6 +70,7 @@
     Controller *_controller;
     NSMutableArray* _deadTouches;
     BOOL _swapABXY;
+    NSCache* _controlImages;
 }
 
 static const float EDGE_WIDTH = .05;
@@ -118,6 +120,7 @@ static float L3_Y;
     _controllerSupport = controllerSupport;
     _controller = [controllerSupport getOscController];
     _deadTouches = [[NSMutableArray alloc] init];
+    _controlImages = [[NSCache alloc] init];
     _swapABXY = streamConfig.swapABXYButtons;
     
     _iPad = ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad);
@@ -373,11 +376,77 @@ static float L3_Y;
     }
 }
 
+- (UIImage*)controlImageNamed:(NSString*)name {
+    UIImage* cached = [_controlImages objectForKey:name];
+    if (cached != nil) {
+        return cached;
+    }
+    UIImage* original = [UIImage imageNamed:name];
+    if (original == nil) {
+        return nil;
+    }
+    if (@available(iOS 10.0, tvOS 10.0, *)) {
+        NSDictionary* labels = @{@"AButton": @"A", @"BButton": @"B", @"XButton": @"X", @"YButton": @"Y",
+                                  @"UpButton": @"↑", @"DownButton": @"↓", @"LeftButton": @"←", @"RightButton": @"→",
+                                  @"StartButton": @"START", @"SelectButton": @"SELECT",
+                                  @"L1": @"L1", @"R1": @"R1", @"L2": @"L2", @"R2": @"R2", @"L3": @"L3", @"R3": @"R3"};
+        NSString* label = labels[name];
+        BOOL stick = [name hasPrefix:@"Stick"];
+        BOOL round = stick || [@[@"AButton", @"BButton", @"XButton", @"YButton", @"L3", @"R3"] containsObject:name];
+        UIColor* color = MLTextColor();
+        if ([name isEqualToString:@"AButton"]) {
+            color = [UIColor colorWithRed:0.35 green:0.84 blue:0.65 alpha:1.0];
+        }
+        else if ([name isEqualToString:@"BButton"]) {
+            color = MLOfflineColor();
+        }
+        else if ([name isEqualToString:@"XButton"] || stick) {
+            color = MLAccentColor();
+        }
+        else if ([name isEqualToString:@"YButton"]) {
+            color = MLPairingColor();
+        }
+
+        // Keep the original point size and scale: these images define hit areas and stick travel.
+        CGSize size = original.size;
+        UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat defaultFormat];
+        format.scale = original.scale;
+        format.opaque = NO;
+        UIGraphicsImageRenderer* renderer = [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+        UIImage* image = [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            CGRect bounds = CGRectMake(0, 0, size.width, size.height);
+            CGRect inset = CGRectInset(bounds, 1.0, 1.0);
+            UIBezierPath* outline = round ? [UIBezierPath bezierPathWithOvalInRect:inset] :
+                [UIBezierPath bezierPathWithRoundedRect:inset cornerRadius:MIN(size.width, size.height) * 0.24];
+            [[MLSurfaceColor() colorWithAlphaComponent:[name isEqualToString:@"StickOuter"] ? 0.45 : 0.8] setFill];
+            [outline fill];
+            [[color colorWithAlphaComponent:0.45] setStroke];
+            outline.lineWidth = 1.0;
+            [outline stroke];
+            if ([name isEqualToString:@"StickInner"]) {
+                CGFloat dotSize = MIN(size.width, size.height) * 0.13;
+                [MLAccentColor() setFill];
+                [[UIBezierPath bezierPathWithOvalInRect:CGRectMake((size.width - dotSize) / 2, (size.height - dotSize) / 2, dotSize, dotSize)] fill];
+            }
+            if (label.length > 0) {
+                CGFloat fontSize = MIN(size.width, size.height) * (label.length > 1 ? 0.38 : 0.46);
+                NSDictionary* attributes = @{NSFontAttributeName: [UIFont systemFontOfSize:fontSize weight:UIFontWeightSemibold],
+                                              NSForegroundColorAttributeName: color};
+                CGSize textSize = [label sizeWithAttributes:attributes];
+                [label drawAtPoint:CGPointMake((size.width - textSize.width) / 2, (size.height - textSize.height) / 2) withAttributes:attributes];
+            }
+        }];
+        [_controlImages setObject:image forKey:name];
+        return image;
+    }
+    return original;
+}
+
 - (void) drawButtons {
-    UIImage* aButtonImage = [UIImage imageNamed:@"AButton"];
-    UIImage* bButtonImage = [UIImage imageNamed:@"BButton"];
-    UIImage* xButtonImage = [UIImage imageNamed:@"XButton"];
-    UIImage* yButtonImage = [UIImage imageNamed:@"YButton"];
+    UIImage* aButtonImage = [self controlImageNamed:@"AButton"];
+    UIImage* bButtonImage = [self controlImageNamed:@"BButton"];
+    UIImage* xButtonImage = [self controlImageNamed:@"XButton"];
+    UIImage* yButtonImage = [self controlImageNamed:@"YButton"];
     
     CGRect aButtonFrame = CGRectMake(BUTTON_CENTER_X - aButtonImage.size.width / 2, BUTTON_CENTER_Y + BUTTON_DIST, aButtonImage.size.width, aButtonImage.size.height);
     CGRect bButtonFrame = CGRectMake(BUTTON_CENTER_X + BUTTON_DIST, BUTTON_CENTER_Y - bButtonImage.size.height / 2, bButtonImage.size.width, bButtonImage.size.height);
@@ -405,25 +474,25 @@ static float L3_Y;
     [_view.layer addSublayer:_yButton];
     
     // create Down button
-    UIImage* downButtonImage = [UIImage imageNamed:@"DownButton"];
+    UIImage* downButtonImage = [self controlImageNamed:@"DownButton"];
     _downButton.frame = CGRectMake(D_PAD_CENTER_X - downButtonImage.size.width / 2, D_PAD_CENTER_Y + D_PAD_DIST, downButtonImage.size.width, downButtonImage.size.height);
     _downButton.contents = (id) downButtonImage.CGImage;
     [_view.layer addSublayer:_downButton];
     
     // create Right button
-    UIImage* rightButtonImage = [UIImage imageNamed:@"RightButton"];
+    UIImage* rightButtonImage = [self controlImageNamed:@"RightButton"];
     _rightButton.frame = CGRectMake(D_PAD_CENTER_X + D_PAD_DIST, D_PAD_CENTER_Y - rightButtonImage.size.height / 2, rightButtonImage.size.width, rightButtonImage.size.height);
     _rightButton.contents = (id) rightButtonImage.CGImage;
     [_view.layer addSublayer:_rightButton];
     
     // create Up button
-    UIImage* upButtonImage = [UIImage imageNamed:@"UpButton"];
+    UIImage* upButtonImage = [self controlImageNamed:@"UpButton"];
     _upButton.frame = CGRectMake(D_PAD_CENTER_X - upButtonImage.size.width / 2, D_PAD_CENTER_Y - D_PAD_DIST - upButtonImage.size.height, upButtonImage.size.width, upButtonImage.size.height);
     _upButton.contents = (id) upButtonImage.CGImage;
     [_view.layer addSublayer:_upButton];
     
     // create Left button
-    UIImage* leftButtonImage = [UIImage imageNamed:@"LeftButton"];
+    UIImage* leftButtonImage = [self controlImageNamed:@"LeftButton"];
     _leftButton.frame = CGRectMake(D_PAD_CENTER_X - D_PAD_DIST - leftButtonImage.size.width, D_PAD_CENTER_Y - leftButtonImage.size.height / 2, leftButtonImage.size.width, leftButtonImage.size.height);
     _leftButton.contents = (id) leftButtonImage.CGImage;
     [_view.layer addSublayer:_leftButton];
@@ -431,13 +500,13 @@ static float L3_Y;
 
 - (void) drawStartSelect {
     // create Start button
-    UIImage* startButtonImage = [UIImage imageNamed:@"StartButton"];
+    UIImage* startButtonImage = [self controlImageNamed:@"StartButton"];
     _startButton.frame = CGRectMake(START_X - startButtonImage.size.width / 2, START_Y - startButtonImage.size.height / 2, startButtonImage.size.width, startButtonImage.size.height);
     _startButton.contents = (id) startButtonImage.CGImage;
     [_view.layer addSublayer:_startButton];
     
     // create Select button
-    UIImage* selectButtonImage = [UIImage imageNamed:@"SelectButton"];
+    UIImage* selectButtonImage = [self controlImageNamed:@"SelectButton"];
     _selectButton.frame = CGRectMake(SELECT_X - selectButtonImage.size.width / 2, SELECT_Y - selectButtonImage.size.height / 2, selectButtonImage.size.width, selectButtonImage.size.height);
     _selectButton.contents = (id) selectButtonImage.CGImage;
     [_view.layer addSublayer:_selectButton];
@@ -445,13 +514,13 @@ static float L3_Y;
 
 - (void) drawBumpers {
     // create L1 button
-    UIImage* l1ButtonImage = [UIImage imageNamed:@"L1"];
+    UIImage* l1ButtonImage = [self controlImageNamed:@"L1"];
     _l1Button.frame = CGRectMake(L1_X - l1ButtonImage.size.width / 2, L1_Y - l1ButtonImage.size.height / 2, l1ButtonImage.size.width, l1ButtonImage.size.height);
     _l1Button.contents = (id) l1ButtonImage.CGImage;
     [_view.layer addSublayer:_l1Button];
     
     // create R1 button
-    UIImage* r1ButtonImage = [UIImage imageNamed:@"R1"];
+    UIImage* r1ButtonImage = [self controlImageNamed:@"R1"];
     _r1Button.frame = CGRectMake(R1_X - r1ButtonImage.size.width / 2, R1_Y - r1ButtonImage.size.height / 2, r1ButtonImage.size.width, r1ButtonImage.size.height);
     _r1Button.contents = (id) r1ButtonImage.CGImage;
     [_view.layer addSublayer:_r1Button];
@@ -459,13 +528,13 @@ static float L3_Y;
 
 - (void) drawTriggers {
     // create L2 button
-    UIImage* l2ButtonImage = [UIImage imageNamed:@"L2"];
+    UIImage* l2ButtonImage = [self controlImageNamed:@"L2"];
     _l2Button.frame = CGRectMake(L2_X - l2ButtonImage.size.width / 2, L2_Y - l2ButtonImage.size.height / 2, l2ButtonImage.size.width, l2ButtonImage.size.height);
     _l2Button.contents = (id) l2ButtonImage.CGImage;
     [_view.layer addSublayer:_l2Button];
     
     // create R2 button
-    UIImage* r2ButtonImage = [UIImage imageNamed:@"R2"];
+    UIImage* r2ButtonImage = [self controlImageNamed:@"R2"];
     _r2Button.frame = CGRectMake(R2_X - r2ButtonImage.size.width / 2, R2_Y - r2ButtonImage.size.height / 2, r2ButtonImage.size.width, r2ButtonImage.size.height);
     _r2Button.contents = (id) r2ButtonImage.CGImage;
     [_view.layer addSublayer:_r2Button];
@@ -473,23 +542,23 @@ static float L3_Y;
 
 - (void) drawSticks {
     // create left analog stick
-    UIImage* leftStickBgImage = [UIImage imageNamed:@"StickOuter"];
+    UIImage* leftStickBgImage = [self controlImageNamed:@"StickOuter"];
     _leftStickBackground.frame = CGRectMake(LS_CENTER_X - leftStickBgImage.size.width / 2, LS_CENTER_Y - leftStickBgImage.size.height / 2, leftStickBgImage.size.width, leftStickBgImage.size.height);
     _leftStickBackground.contents = (id) leftStickBgImage.CGImage;
     [_view.layer addSublayer:_leftStickBackground];
     
-    UIImage* leftStickImage = [UIImage imageNamed:@"StickInner"];
+    UIImage* leftStickImage = [self controlImageNamed:@"StickInner"];
     _leftStick.frame = CGRectMake(LS_CENTER_X - leftStickImage.size.width / 2, LS_CENTER_Y - leftStickImage.size.height / 2, leftStickImage.size.width, leftStickImage.size.height);
     _leftStick.contents = (id) leftStickImage.CGImage;
     [_view.layer addSublayer:_leftStick];
     
     // create right analog stick
-    UIImage* rightStickBgImage = [UIImage imageNamed:@"StickOuter"];
+    UIImage* rightStickBgImage = [self controlImageNamed:@"StickOuter"];
     _rightStickBackground.frame = CGRectMake(RS_CENTER_X - rightStickBgImage.size.width / 2, RS_CENTER_Y - rightStickBgImage.size.height / 2, rightStickBgImage.size.width, rightStickBgImage.size.height);
     _rightStickBackground.contents = (id) rightStickBgImage.CGImage;
     [_view.layer addSublayer:_rightStickBackground];
     
-    UIImage* rightStickImage = [UIImage imageNamed:@"StickInner"];
+    UIImage* rightStickImage = [self controlImageNamed:@"StickInner"];
     _rightStick.frame = CGRectMake(RS_CENTER_X - rightStickImage.size.width / 2, RS_CENTER_Y - rightStickImage.size.height / 2, rightStickImage.size.width, rightStickImage.size.height);
     _rightStick.contents = (id) rightStickImage.CGImage;
     [_view.layer addSublayer:_rightStick];
@@ -499,18 +568,18 @@ static float L3_Y;
 }
 
 - (void) drawL3R3 {
-    UIImage* l3ButtonImage = [UIImage imageNamed:@"L3"];
+    UIImage* l3ButtonImage = [self controlImageNamed:@"L3"];
     _l3Button.frame = CGRectMake(L3_X - l3ButtonImage.size.width / 2, L3_Y - l3ButtonImage.size.height / 2, l3ButtonImage.size.width, l3ButtonImage.size.height);
     _l3Button.contents = (id) l3ButtonImage.CGImage;
     _l3Button.cornerRadius = l3ButtonImage.size.width / 2;
-    _l3Button.borderColor = [UIColor colorWithRed:15.f/255 green:160.f/255 blue:40.f/255 alpha:1.f].CGColor;
+    _l3Button.borderColor = MLAccentColor().CGColor;
     [_view.layer addSublayer:_l3Button];
     
-    UIImage* r3ButtonImage = [UIImage imageNamed:@"R3"];
+    UIImage* r3ButtonImage = [self controlImageNamed:@"R3"];
     _r3Button.frame = CGRectMake(R3_X - r3ButtonImage.size.width / 2, R3_Y - r3ButtonImage.size.height / 2, r3ButtonImage.size.width, r3ButtonImage.size.height);
     _r3Button.contents = (id) r3ButtonImage.CGImage;
     _r3Button.cornerRadius = r3ButtonImage.size.width / 2;
-    _r3Button.borderColor = [UIColor colorWithRed:15.f/255 green:160.f/255 blue:40.f/255 alpha:1.f].CGColor;
+    _r3Button.borderColor = MLAccentColor().CGColor;
     [_view.layer addSublayer:_r3Button];
 }
 

@@ -332,18 +332,24 @@
             [_overlayView setTextAlignment:NSTextAlignmentCenter];
         }
         
-        [_overlayView setTextColor:[UIColor lightGrayColor]];
-        [_overlayView setBackgroundColor:[UIColor blackColor]];
+        [_overlayView setTextColor:MLTextColor()];
+        [_overlayView setBackgroundColor:[MLBackgroundColor() colorWithAlphaComponent:0.78]];
+        _overlayView.layer.cornerRadius = 10.0;
+        _overlayView.layer.borderWidth = 0.5;
+        _overlayView.layer.borderColor = MLBorderColor().CGColor;
 #if TARGET_OS_TV
-        [_overlayView setFont:[UIFont systemFontOfSize:24]];
+        [_overlayView setFont:[UIFont monospacedDigitSystemFontOfSize:24 weight:UIFontWeightMedium]];
+        _overlayView.textContainerInset = UIEdgeInsetsMake(12, 18, 12, 18);
 #else
-        [_overlayView setFont:[UIFont systemFontOfSize:12]];
+        [_overlayView setFont:[UIFont monospacedDigitSystemFontOfSize:12 weight:UIFontWeightMedium]];
+        _overlayView.textContainerInset = UIEdgeInsetsMake(8, 12, 8, 12);
 #endif
-        [_overlayView setAlpha:0.5];
+        [_overlayView setAlpha:1.0];
         [self.view addSubview:_overlayView];
     }
     
     if (text != nil) {
+        _overlayView.textColor = _statsUpdateTimer == nil ? MLPairingColor() : MLTextColor();
         // We set our bounds to the maximum width in order to work around a bug where
         // sizeToFit interacts badly with the UITextView's line breaks, causing the
         // width to get smaller and smaller each time as more line breaks are inserted.
@@ -521,6 +527,7 @@
         [conTermAlert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
+        MLStyleDialog(conTermAlert);
         [self presentViewController:conTermAlert animated:YES completion:nil];
     });
 
@@ -566,6 +573,7 @@
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
+        MLStyleDialog(alert);
         [self presentViewController:alert animated:YES completion:nil];
     });
     
@@ -586,6 +594,7 @@
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:^(UIAlertAction* action){
             [self returnToMainFrame];
         }]];
+        MLStyleDialog(alert);
         [self presentViewController:alert animated:YES completion:nil];
     });
 }

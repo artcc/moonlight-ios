@@ -453,6 +453,7 @@ BOOL isCustomResolution(CGSize res) {
         
         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Custom Resolution Selected" message: @"Custom resolutions are not officially supported by GeForce Experience, so it will not set your host display resolution. You will need to set it manually while in game.\n\nResolutions that are not supported by your client or host PC may cause streaming errors." preferredStyle:UIAlertControllerStyleAlert];
         [alertController addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        MLStyleDialog(alertController);
         [self presentViewController:alertController animated:YES completion:nil];
     }]];
 
@@ -461,6 +462,7 @@ BOOL isCustomResolution(CGSize res) {
         [self.resolutionSelector setSelectedSegmentIndex:self->_lastSelectedResolutionIndex];
     }]];
 
+    MLStyleDialog(alertController);
     [self presentViewController:alertController animated:YES completion:nil];
 }
 
