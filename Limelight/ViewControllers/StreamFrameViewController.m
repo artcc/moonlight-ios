@@ -12,6 +12,7 @@
 #import "StreamManager.h"
 #import "ControllerSupport.h"
 #import "DataManager.h"
+#import "MoonlightAppearance.h"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -42,6 +43,7 @@
     UITextView *_overlayView;
     UILabel *_stageLabel;
     UILabel *_tipLabel;
+    UIView *_connectionPanel;
     UIActivityIndicatorView *_spinner;
     StreamView *_streamView;
     UIScrollView *_scrollView;
@@ -78,6 +80,8 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
+
+    self.view.backgroundColor = MLBackgroundColor();
     
     [self.navigationController setNavigationBarHidden:YES animated:YES];
     
@@ -88,9 +92,12 @@
     _stageLabel = [[UILabel alloc] init];
     [_stageLabel setUserInteractionEnabled:NO];
     [_stageLabel setText:[NSString stringWithFormat:@"Starting %@...", self.streamConfig.appName]];
+    _stageLabel.font = [UIFont systemFontOfSize:_stageLabel.font.pointSize weight:UIFontWeightSemibold];
+    _stageLabel.adjustsFontSizeToFitWidth = YES;
+    _stageLabel.minimumScaleFactor = 0.7;
     [_stageLabel sizeToFit];
     _stageLabel.textAlignment = NSTextAlignmentCenter;
-    _stageLabel.textColor = [UIColor whiteColor];
+    _stageLabel.textColor = MLTextColor();
     _stageLabel.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height / 2);
     
     _spinner = [[UIActivityIndicatorView alloc] init];
@@ -100,6 +107,7 @@
 #else
     [_spinner setActivityIndicatorViewStyle:UIActivityIndicatorViewStyleWhite];
 #endif
+    _spinner.color = MLAccentColor();
     [_spinner sizeToFit];
     [_spinner startAnimating];
     _spinner.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height / 2 - _stageLabel.frame.size.height - _spinner.frame.size.height);
@@ -147,7 +155,7 @@
 #endif
     
     [_tipLabel sizeToFit];
-    _tipLabel.textColor = [UIColor whiteColor];
+    _tipLabel.textColor = MLSecondaryTextColor();
     _tipLabel.textAlignment = NSTextAlignmentCenter;
     _tipLabel.center = CGPointMake(self.view.frame.size.width / 2, self.view.frame.size.height * 0.9);
     
@@ -206,9 +214,57 @@
         [self.view addSubview:_streamView];
     }
     
+    _connectionPanel = [[UIView alloc] init];
+    _connectionPanel.userInteractionEnabled = NO;
+    _connectionPanel.backgroundColor = MLSurfaceColor();
+#if TARGET_OS_TV
+    _connectionPanel.layer.cornerRadius = 28.0;
+#else
+    _connectionPanel.layer.cornerRadius = 20.0;
+#endif
+    _connectionPanel.layer.borderWidth = 1.0;
+    _connectionPanel.layer.borderColor = MLBorderColor().CGColor;
+    _connectionPanel.layer.shadowColor = [UIColor blackColor].CGColor;
+    _connectionPanel.layer.shadowOpacity = 0.25;
+    _connectionPanel.layer.shadowRadius = 16.0;
+    _connectionPanel.layer.shadowOffset = CGSizeMake(0, 8);
+    [self.view addSubview:_connectionPanel];
     [self.view addSubview:_stageLabel];
     [self.view addSubview:_spinner];
     [self.view addSubview:_tipLabel];
+    [self layoutConnectionPanel];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self layoutConnectionPanel];
+}
+
+- (void)layoutConnectionPanel {
+    // This panel only decorates the existing connection status views.
+    if (_connectionPanel == nil || _connectionPanel.hidden) {
+        return;
+    }
+
+#if TARGET_OS_TV
+    CGFloat padding = 40.0;
+    CGFloat margin = 80.0;
+#else
+    CGFloat padding = 24.0;
+    CGFloat margin = 20.0;
+#endif
+    CGRect bounds = self.view.bounds;
+    [_stageLabel sizeToFit];
+    CGRect labelFrame = _stageLabel.frame;
+    labelFrame.size.width = MIN(labelFrame.size.width, MAX(1.0, bounds.size.width - 2 * (margin + padding)));
+    _stageLabel.frame = labelFrame;
+    _stageLabel.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+    _spinner.center = CGPointMake(_stageLabel.center.x, _stageLabel.center.y - _stageLabel.frame.size.height - _spinner.frame.size.height);
+    _tipLabel.center = CGPointMake(CGRectGetMidX(bounds), bounds.size.height * 0.9);
+
+    _connectionPanel.frame = CGRectInset(CGRectUnion(_stageLabel.frame, _spinner.frame), -padding, -padding);
+    _connectionPanel.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:_connectionPanel.bounds
+                                                                cornerRadius:_connectionPanel.layer.cornerRadius].CGPath;
 }
 
 - (UIView *)viewForZoomingInScrollView:(UIScrollView *)scrollView {
@@ -374,6 +430,7 @@
         // the first frame of video.
         self->_stageLabel.hidden = YES;
         self->_tipLabel.hidden = YES;
+        self->_connectionPanel.hidden = YES;
         
         [self->_streamView showOnScreenControls];
         
@@ -476,8 +533,7 @@
         NSString* lowerCase = [NSString stringWithFormat:@"%s in progress...", stageName];
         NSString* titleCase = [[[lowerCase substringToIndex:1] uppercaseString] stringByAppendingString:[lowerCase substringFromIndex:1]];
         [self->_stageLabel setText:titleCase];
-        [self->_stageLabel sizeToFit];
-        self->_stageLabel.center = CGPointMake(self.view.frame.size.width / 2, self->_stageLabel.center.y);
+        [self layoutConnectionPanel];
     });
 }
 

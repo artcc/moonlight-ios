@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-// Shared visual styling for the browsing UI. Streaming views keep their own styling.
+// Shared visual styling for browsing and transient connection UI.
 static inline UIColor* MLBackgroundColor(void) {
     return [UIColor colorWithRed:0.05 green:0.07 blue:0.11 alpha:1.0];
 }
